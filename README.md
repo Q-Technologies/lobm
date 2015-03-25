@@ -41,6 +41,7 @@ lobm -c /path/to/baseline_definition.yaml
 
 ### Options
 `-h` a simple help message
+
 `-c` full path to the baseline definiton file 
 
 ### Baseline Definiton File
