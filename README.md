@@ -34,3 +34,27 @@ Create the `lobm.yaml` file in one of the locations specified in the install sec
 
 ## Usage
 
+### Invocation
+```bash
+lobm -c /path/to/baseline_definition.yaml
+```
+
+### Options
+`-h` a simple help message
+`-c` full path to the baseline definiton file 
+
+### Baseline Definiton File
+The baseline configuration file needs to be in YAML format with the following fields:
+```yaml
+name: baseline_name
+rpm_dirs:
+  -
+    dir: /path/to/first/dir/of/RPMs
+    date: YYYY-MM-DD  # Date to select RPMs up to
+  -
+    dir: /path/to/second/dir/of/RPMs
+    date: YYYY-MM-DD  # Date to select RPMs up to
+```
+
+## TODO
+
