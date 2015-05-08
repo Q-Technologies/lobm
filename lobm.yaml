@@ -1,0 +1,6 @@
+baseline_dir: "/repo/baselines/"
+http_served_from: "/repo"
+http_server_name: "install.example.com"
+http_server_proto: "http"
+createrepo_cmd: "/usr/bin/createrepo"
+workers: 2
