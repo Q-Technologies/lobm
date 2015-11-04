@@ -10,7 +10,7 @@ Url:            https://github.com/Q-Technologies/lobm
 Group:          Applications/System
 BuildArch:      noarch
 BuildRoot:      %{_tmppath}/%{name}-build
-Requires:       perl-YAML
+Requires:       perl(YAML)
 Requires:       createrepo
  
 %description

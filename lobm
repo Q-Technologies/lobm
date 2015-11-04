@@ -154,7 +154,7 @@ my $os_release = $bl_conf->{'os_release'};
 my $exclude = $bl_conf->{'exclude'};
 my $include = $bl_conf->{'include'};
 # Create the destination baseline directory
-$mainconf->{baseline_dir} = $mainconf->{baseline_dir} . $bl_conf->{'name'};
+$mainconf->{baseline_dir} = $mainconf->{baseline_dir} . "/" . $bl_conf->{'name'};
 remove_tree( $mainconf->{baseline_dir} );
 if( ! -d $mainconf->{baseline_dir} ){
         if( ! make_path( $mainconf->{baseline_dir}."/RPMS/noarch", $mainconf->{baseline_dir}."/RPMS/x86_64", {mode=>0755}) ){
