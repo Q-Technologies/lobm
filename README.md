@@ -11,6 +11,13 @@ Packages are sorted according to their version numbers, not their file modificat
 
 ## Install
 
+Install the following Perl Modules first (either through CPAN or as packages):
+* YAML
+* Data::Dumper
+
+And these RPMs:
+* createrepo
+
 Download the script from [here](https://github.com/Q-Technologies/lobm).
 
 Install the script wherever you prefer, but it will look in the following locations for it's config file (in this order):
