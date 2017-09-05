@@ -2,8 +2,8 @@
 # spec file for package lobm
 #
 Name:           lobm
-Version:        2.1
-Release:        1.1
+Version:        3.0
+Release:        1.0
 License:        Artistic
 Summary:        Linux OS Baseline Maker
 Url:            https://github.com/Q-Technologies/lobm

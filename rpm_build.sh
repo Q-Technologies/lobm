@@ -11,6 +11,6 @@ do echo Building RPM on $host
 	rsync -av --delete --exclude=\*.rpm ${dir:?}/lobm ${dir:?}/lobm.yaml ${dir:?}/README.md ${dir:?}/LICENSE $host:rpmbuild/SOURCES
 	rsync -av --delete --exclude=\*.rpm ${dir:?}/lobm.spec $host:rpmbuild/SPECS
 	ssh $host rpmbuild -ba rpmbuild/SPECS/lobm.spec
-    rsync -av $host:rpmbuild/SRPMS/ RPMS/
-    rsync -av $host:rpmbuild/RPMS/ RPMS/
+    rsync -av $host:rpmbuild/SRPMS/*lobm* RPMS/
+    rsync -av $host:rpmbuild/RPMS/*/*lobm* RPMS/
 done
