@@ -274,16 +274,8 @@ for my $rpm_dir ( @$rpm_dirs ){
 my $strip_words;
 $strip_words = 1 if( $target =~ /red.*hat|centos|rhel/i );
 
-# Sort minor number first - reverse
-#@rpm_list = sort { versioncmp($b->[2], $a->[2] ) } @rpm_list;
-@rpm_list = sort { versioncmp($b->[2], $a->[2], $strip_words) } @rpm_list;
-
-# Sort major number next - reverse
-#@rpm_list = sort { versioncmp($b->[1], $a->[1] ) } @rpm_list;
-@rpm_list = sort { versioncmp($b->[1], $a->[1]) } @rpm_list;
-
-# Sort name last
-@rpm_list = sort { $a->[0] cmp $b->[0] } @rpm_list;
+# Sort package names and major and minor numbers (numbers in reverse order)
+@rpm_list = sort { sort_all() } @rpm_list;
 #print Dumper( @rpm_list );
 
 my ( $last_rpm, $last_maj, $last_min, $version );
@@ -374,14 +366,14 @@ FILE
 }
 
 my $url = "/" . $baseline_dir;
-say $url;
+#say $url;
 my $ss = $http_served_from;
-say $ss;
+#say $ss;
 for( $url ){
     s/\/+/\//;
     s/^$ss//;
 }
-say $url;
+#say $url;
 my $name = basename($url);
 if( $target =~ /sles|suse/i ){
     say "\nUse this command to add the repository to client machines:\n";
@@ -415,15 +407,44 @@ if( $target =~ /sles|suse/i ){
 # Function to intelligently find which rpm has the higher version              #
 #                                                                              #
 ################################################################################
-sub versioncmp( $$ ) {
+sub sort_all() {
+    # got $a and $b automatically
     #print $_[0] . " <=> " . $_[1] . "\n";
-    my @A = split( /\./, $_[0] );
-    my @B = split( /\./, $_[1] );
-    my $strip_words = $_[2];
-    if( $strip_words ){
-        strip_words( \@A );
-        strip_words( \@B );
-    }
+    #say Dumper($a)." cmp ".Dumper($b);
+    my $a0 = $a->[0];
+    my $b0 = $b->[0];
+    my $a1 = $a->[1];
+    my $b1 = $b->[1];
+    my $a2 = $a->[2];
+    my $b2 = $b->[2];
+    my $ans0 = $a0 cmp $b0;
+
+    return $ans0 if $ans0; # name doesn't match
+
+
+    # Versions need to be in reverse order as we want the latest first
+    #my $ans1 = $b1 <=> $a1;
+    my $ans1 = compare( $b1, $a1 );
+
+    say "$a0: $a1 cmp $b1, ans1: $ans1" if $ans1;
+    return $ans1 if $ans1; # major number doesn't match
+
+    # Process the minor number
+    strip_words( \$a2 );
+    strip_words( \$b2 );
+    my $ans2 = compare( $b2, $a2 );
+    say "$a0 ($a1): $a2 cmp $b2, ans2: $ans2";
+
+    return $ans2;
+}
+sub compare (){
+    my $a = shift;
+    my $b = shift;
+
+    #return $a <=> $b;
+    
+    my @A = split( /\./, $a );
+    my @B = split( /\./, $b );
 
     # Make the arrays the same size
     my $diff = @A - @B;
@@ -441,22 +462,23 @@ sub versioncmp( $$ ) {
     while (@A and @B) {
 	    $A = shift @A;
 	    $B = shift @B;
-        #print $A . " <=> " . $B . "\n";
 	    if ($A =~ /^\d+$/ and $B =~ /^\d+$/) {
-	        if ($A =~ /^0/ || $B =~ /^0/) {
-		        return $A cmp $B if $A cmp $B;
-	        } else {
-		        return $A <=> $B if $A <=> $B;
-	        }
+            #say "numbers: ".$A . " <=> " . $B;
+            # both only digits - remove leading zero to be safe
+            $A =~ s/^0+//;
+            $B =~ s/^0+//;
+		    return $A <=> $B if $A <=> $B;
 	    } else {
+            #say "letters: ".$A . " cmp " . $B;
 	        $A = uc $A;
 	        $B = uc $B;
 	        return $A cmp $B if $A cmp $B;
 	    }	
     }
-    @A <=> @B;
+    # Fall through - everything matches
+    #say "fall through";
+    return 0;
 }
-
 
 
 ################################################################################
@@ -466,13 +488,16 @@ sub versioncmp( $$ ) {
 ################################################################################
 sub strip_words {
     my $ref = shift;
-    my $i = 0;
-    for my $new ( @$ref ){
-        if( $new =~ /el\d_*|centos/ ){
-            $new =~ s/el\d_*|centos//g;
-            $new = 0 if ! $new;
-            splice(@$ref,$i,1, ( $new ));
+    #my $i = 0;
+    my $new = $$ref;
+    if( $new =~ /el\d+/ ){
+        if( $new =~ /el\d+_/ ){
+            $new =~ s/el\d+_//g;
+        } else {
+            $new =~ s/el\d+/0/g;
         }
-        $i++;
+        $$ref = $new;
+        #splice(@$ref,$i,1, ( $new ));
     }
+        #$i++;
 }
