@@ -37,7 +37,7 @@ use Data::Dumper;
 use File::Path qw(make_path remove_tree);
 use File::Find;
 use File::Basename;
-use YAML qw'LoadFile';
+use YAML::XS qw'LoadFile';
 use POSIX 'strftime';
 use lib '/code/perl/00-modules-mine';
 use Log::MixedColor;
@@ -45,6 +45,8 @@ use 5.10.0;
 
 use constant DEBUG_MSG => "debug";
 use constant ERROR_MSG => "error";
+
+my $date_format = qr/\d{4,4}-\d\d-\d\d/;
 
 my $log = Log::MixedColor->new;
 
@@ -63,6 +65,10 @@ $0 -c /path/to/config.yaml
 \t\t-c full path to the configuration file for the baseline
 \t\t-g GPG key to use to sign the repository (no signing if omitted)
 \t\t-r force running as root (should not be necessary normally)
+\t\t-o override date with specified value. Use an existing file, all instances
+\t\t     of a date (YYYY-MM-DD) will be replaced with an override.  This is
+\t\t     when you want to periodically automatically create a baseline using
+\t\t     an existing configuration file.
 
 \tThe baseline configuration file needs to be in YAML format with
 \tthe following fields:
@@ -95,14 +101,13 @@ exclude: # packages to exclude from the repo
 
 \tIt requires content along the following lines:
 
-baseline_dir: "/software/repos/baselines/" # Place on disk for new repositories
-http_served_from: "/software"              # i.e. the DocumentRoot
-http_server_name: "install.example.com"    # repository accessible by server name 
-http_server_proto: "http"                  # repository available over protocal
-createrepo_cmd: "/usr/bin/createrepo"      # path to createrepo script
-workers: 2                                 # number of workers to use for the 
-                                           #     createrepo (if not specified then
-                                           #     then workers will equal cpu threads)
+baseline_dir: "/software/repos/baselines/"          # Place on disk for new repositories
+http_served_from: "/software"                       # i.e. the DocumentRoot
+http_server_uri: "https://install.example.com/repo" # repository accessible by URI
+createrepo_cmd: "/usr/bin/createrepo"               # path to createrepo script
+workers: 2                                          # number of workers to use for the
+                                                    # createrepo (if not specified then
+                                                    # then workers will equal cpu threads)
 
 USAGE
 
@@ -113,8 +118,9 @@ our $opt_v; # Verbose
 our $opt_d; # Debug
 our $opt_g; # GPG key name
 our $opt_r; # Run as root
+our $opt_o; # Override the date
 
-getopts('c:hvrg:d');
+getopts('c:hvrg:do:');
 
 if( $opt_h or ! $opt_c ){
         print $usage_msg;
@@ -133,7 +139,13 @@ if( ! -r $opt_c or ! -f $opt_c ){
 # for the running user
 if( $> == 0 and ! $opt_r ){
     print STDERR "Error: Not permitted to run as root (over-ride with -r)";
-    exit 1
+    exit 1;
+}
+
+# Check format of override date
+if( $opt_o and $opt_o !~ /^$date_format$/ ){
+    print STDERR "Error: the override date must be in YYYY-MM-DD format!";
+    exit 1;
 }
 
 my $gpg_key;
@@ -155,10 +167,11 @@ my $mainconf = LoadFile($mainconf);
 #print Dumper( $mainconf );
 my $workers = $mainconf->{workers};
 chomp( $workers = `grep -c vendor_id /proc/cpuinfo` ) if ! $workers; # Match workers to the numbers of CPUs/threads
-my $http_server_name = $mainconf->{http_server_name};
-chomp( $http_server_name = `hostname` ) if ! $http_server_name;
-my $http_server_proto = $mainconf->{http_server_proto};
-$log->fatal_err( "You need to specify ".$log->quote('http_server_proto')." in the main config file" ) if not $http_server_proto;
+my $http_server_uri = $mainconf->{http_server_uri};
+unless( $http_server_uri ) {
+    say STDERR "Error: Please update the main configuration file with http_server_uri";
+    exit 1;
+}
 my $http_served_from = $mainconf->{http_served_from};
 $log->fatal_err( "You need to specify ".$log->quote('http_served_from')." in the main config file" ) if not $http_served_from;
 my $baseline_dir = $mainconf->{baseline_dir};
@@ -183,6 +196,7 @@ my $exclude = $bl_conf->{'exclude'};
 my $include = $bl_conf->{'include'};
 # Create the destination baseline directory
 my $name = $bl_conf->{'name'};
+$name =~ s/$date_format/$opt_o/g if $opt_o;
 $log->fatal_err( "You need to specify the baseline name in the baseline file" ) if not $name;
 $baseline_dir = $baseline_dir . "/" . $name;
 remove_tree( $baseline_dir );
@@ -205,6 +219,11 @@ my @rpm_list;
 $log->info_msg( "Finding the RPMs and setting up sym links");
 for my $rpm_dir ( @$rpm_dirs ){
         my $date = $rpm_dir->{'date'};
+        if( $date !~ /^\d{4,4}-\d\d-\d\d$/ ){
+            print STDERR "Error: the date field for $rpm_dir must be in YYYY-MM-DD format!";
+            exit 1;
+        }
+        $date = $opt_o if $opt_o;
         my $dir = $rpm_dir->{'dir'};
         my( $year, $mon, $mday ) = split( /-/, $date );
         my $reftime = timelocal(59,59,23,$mday,$mon - 1,$year);
@@ -355,21 +374,24 @@ FILE
 }
 
 my $url = "/" . $baseline_dir;
+say $url;
 my $ss = $http_served_from;
+say $ss;
 for( $url ){
-    s/$ss//;
     s/\/+/\//;
+    s/^$ss//;
 }
+say $url;
 my $name = basename($url);
 if( $target =~ /sles|suse/i ){
     say "\nUse this command to add the repository to client machines:\n";
-    say "\tzypper ar -f -c -G $http_server_proto://$http_server_name$url ".$name."\n";
+    say "\tzypper ar -f -c -G $http_server_uri$url ".$name."\n";
 } elsif( $target =~ /red.*hat|centos|rhel/i ){
     say "Create '/etc/yum.repos.d/".$name.".repo' on each client with this content:";
     (my $filecontent = qq{
         [$name]
         name=$bl_conf->{'description'}
-        baseurl=$http_server_proto://$http_server_name$url
+        baseurl=$http_server_uri$url
         enabled=1
         gpgcheck=0
         sslverify=0

@@ -2,7 +2,7 @@
 # spec file for package lobm
 #
 Name:           lobm
-Version:        3.0
+Version:        3.1
 Release:        1.0
 License:        Artistic
 Summary:        Linux OS Baseline Maker
@@ -10,7 +10,8 @@ Url:            https://github.com/Q-Technologies/lobm
 Group:          Applications/System
 BuildArch:      noarch
 BuildRoot:      %{_tmppath}/%{name}-build
-Requires:       perl(YAML)
+AutoReqProv:    no
+Requires:       perlbrew
 Requires:       createrepo
  
 %description
