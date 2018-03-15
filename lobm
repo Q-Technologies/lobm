@@ -62,6 +62,7 @@ $0 -c /path/to/config.yaml
 \t\t-h this help message
 \t\t-v display messages describing what is happening
 \t\t-d display debug messages
+\t\t-i include 32bit RPMs that normally ship in 64bit distros
 \t\t-c full path to the configuration file for the baseline
 \t\t-g GPG key to use to sign the repository (no signing if omitted)
 \t\t-r force running as root (should not be necessary normally)
@@ -119,13 +120,15 @@ our $opt_d; # Debug
 our $opt_g; # GPG key name
 our $opt_r; # Run as root
 our $opt_o; # Override the date
+our $opt_i; # Include 32bit RPMs
 
-getopts('c:hvrg:do:');
+getopts('c:hvrg:do:i');
 
 if( $opt_h or ! $opt_c ){
         print $usage_msg;
         exit;
 }
+my $exclude_32bit = not $opt_i;
 
 if( ! $opt_c ){
         $log->fatal_err( "The path to the baseline configuration is required.\n".$usage_msg);
@@ -237,7 +240,8 @@ for my $rpm_dir ( @$rpm_dirs ){
         closedir DIR;
         OUTER: for my $rpm (@rpms ){
                 #next unless $rpm =~ /avahi-ui/;
-                next if( $rpm =~ /(\.src\.|\/boot\/|\.i\d86\.|\.drpm$|\.delta\.rpm$)/ );
+                next if( $rpm =~ /(\.src\.|\/boot\/|\.i\d86\.|\.drpm$|\.delta\.rpm$)/ and $exclude_32bit );
+                next if( $rpm =~ /(\.src\.|\/boot\/|\.drpm$|\.delta\.rpm$)/ );
                 my $mtime = (stat($rpm))[9];
                         #print $rpm, "\n";
                 if( $reftime > $mtime ){
@@ -286,6 +290,7 @@ for my $ar ( @rpm_list ){
     }
     if( $version <= $max_versions ){
         # Construct the new filename
+        mkdir $baseline_dir."/RPMS/".$ar->[3] if not -d $baseline_dir."/RPMS/".$ar->[3];
         my $newfile = $baseline_dir."/RPMS/".$ar->[3]."/".$ar->[0]."-".$ar->[1]."-".$ar->[2].".".$ar->[3].".".$ar->[4];
         
         # For Red Hat we can stay on a release if specified in the config file - skip release rpm if wrong version
@@ -426,14 +431,14 @@ sub sort_all() {
     #my $ans1 = $b1 <=> $a1;
     my $ans1 = compare( $b1, $a1 );
 
-    say "$a0: $a1 cmp $b1, ans1: $ans1" if $ans1;
+    #say "$a0: $a1 cmp $b1, ans1: $ans1" if $ans1;
     return $ans1 if $ans1; # major number doesn't match
 
     # Process the minor number
     strip_words( \$a2 );
     strip_words( \$b2 );
     my $ans2 = compare( $b2, $a2 );
-    say "$a0 ($a1): $a2 cmp $b2, ans2: $ans2";
+    #say "$a0 ($a1): $a2 cmp $b2, ans2: $ans2";
 
     return $ans2;
 }
