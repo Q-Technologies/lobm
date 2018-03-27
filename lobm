@@ -13,17 +13,9 @@
 #          see https://github.com/Q-Technologies/lobm for full details         #
 #                                                                              #
 #                                                                              #
-# Copyright 2013-2015 - Q-Technologies (http://www.Q-Technologies.com.au       #
-#                                                                              #
-#                                                                              #
-# Revision History                                                             #
-#                                                                              #
-#    Aug 2013 - Initial version - support native zypper repos only             #
-#    Feb 2014 - Changed to create YUM repos, but only tested for SuSE RPMs     #
-#    Apr 2015 - Updated to correctly sort Red Hat RPMs                         #
+# Copyright 2013-2018 - Q-Technologies (http://www.Q-Technologies.com.au       #
 #                                                                              #
 # Issues                                                                       #
-#    Only builds x64 repos at this stage                                       #
 #    Only uses the file modification date to determine cutoff, it could use    #
 #        the RPM build date instead.                                           #
 #    Better validation of inputs from the YAML files is required               #
@@ -204,13 +196,15 @@ $log->fatal_err( "You need to specify the baseline name in the baseline file" ) 
 $baseline_dir = $baseline_dir . "/" . $name;
 remove_tree( $baseline_dir );
 if( ! -d $baseline_dir ){
-        if( ! make_path( $baseline_dir."/RPMS/noarch", $baseline_dir."/RPMS/x86_64", {mode=>0755}) ){
-                $log->fatal_err( "Could not create $baseline_dir: $!" );
-        }
-        #print "Successfully created ", $mainconf->{baseline_dir}, "\n";
+    my @paths = ( $baseline_dir."/RPMS/noarch", $baseline_dir."/RPMS/x86_64" );
+    push @paths, $baseline_dir."/RPMS/i686" unless $exclude_32bit;
+    if( ! make_path( @paths, {mode=>0755}) ){
+        $log->fatal_err( "Could not create $baseline_dir: $!" );
+    }
+    #print "Successfully created ", $mainconf->{baseline_dir}, "\n";
 }
 if( ! -w $baseline_dir ){
-        $log->fatal_err( "Cannot write to $baseline_dir: $!" );
+    $log->fatal_err( "Cannot write to $baseline_dir: $!" );
 }
 my $zyppdate = POSIX::strftime('%Y%m%d%H%M%S', localtime);
 
@@ -284,7 +278,8 @@ $strip_words = 1 if( $target =~ /red.*hat|centos|rhel/i );
 
 my ( $last_rpm, $last_maj, $last_min, $version );
 for my $ar ( @rpm_list ){
-    if( $last_rpm ne $ar->[0] ){
+    my $new_rpm = join( '.', $ar->[0], $ar->[3] );
+    if( $last_rpm ne $new_rpm ){
         # reset versions counter
         $version = 1;
     }
@@ -304,8 +299,8 @@ for my $ar ( @rpm_list ){
             $log->fatal_err( "Cannot symbolic link, maybe RPM name does not follow convention: $!" );
         }
     }
-    #print $ar->[0], " ", $last_maj, " ", $ar->[1], " ", $last_min, " ", $ar->[2], "\n" if $last_maj ne $ar->[1] and $last_rpm eq $ar->[0];
-    $last_rpm = $ar->[0];
+    #print $ar->[0], " ", $last_maj, " ", $ar->[1], " ", $last_min, " ", $ar->[2], "\n" if $last_maj ne $ar->[1] and $last_rpm eq $new_rpm;
+    $last_rpm = $new_rpm;
     $last_maj = $ar->[1];
     $last_min = $ar->[2];
     $version++;
@@ -416,8 +411,8 @@ sub sort_all() {
     # got $a and $b automatically
     #print $_[0] . " <=> " . $_[1] . "\n";
     #say Dumper($a)." cmp ".Dumper($b);
-    my $a0 = $a->[0];
-    my $b0 = $b->[0];
+    my $a0 = join('.', $a->[0], $a->[3] );
+    my $b0 = join('.', $b->[0], $b->[3] );
     my $a1 = $a->[1];
     my $b1 = $b->[1];
     my $a2 = $a->[2];
