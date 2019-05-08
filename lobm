@@ -29,7 +29,7 @@ use Data::Dumper;
 use File::Path qw(make_path remove_tree);
 use File::Find;
 use File::Basename;
-use YAML::XS qw'LoadFile';
+use YAML::XS qw(LoadFile Dump);
 use POSIX 'strftime';
 use lib '/code/perl/00-modules-mine';
 use Log::MixedColor;
@@ -208,7 +208,8 @@ if( ! -w $baseline_dir ){
 }
 my $zyppdate = POSIX::strftime('%Y%m%d%H%M%S', localtime);
 
-
+# Write a record of how this baseline was created
+write_record();
 
 # find the source RPMs
 my $rpm_dirs = $bl_conf->{'rpm_dirs'};
@@ -290,7 +291,7 @@ for my $ar ( @rpm_list ){
         
         # For Red Hat we can stay on a release if specified in the config file - skip release rpm if wrong version
         # If it is not specified, will default to latest release
-        next if( $ar->[2] !~ /^$os_release/ and $ar->[0] eq "redhat-release-server" );
+        next if( $ar->[1] !~ /^$os_release/ and $ar->[0] =~ /^redhat-release-server/ );
         
         # Create the symbolic link, but skip if already exists - same rpm may have come from 2 sources
         #print $ar->[0], " ", $ar->[1], " ", $ar->[2], " ", $ar->[5], "\n";
@@ -397,10 +398,23 @@ if( $target =~ /sles|suse/i ){
 
 
 
+################################################################################
+#                                                                              #
+# Function to create a record of how a baseline was created                    #
+#                                                                              #
+################################################################################
 
-
-
-
+sub write_record {
+    my $_32_bit = "no";
+    $_32_bit = "yes" if $opt_i;
+    my $filename = $baseline_dir."/history.txt";
+    open FILE, ">$filename" or die $!;
+    say FILE "This baseline was created with the following options:\n";
+    say FILE "Date override: $opt_o\n";
+    say FILE "32 bit as well: $_32_bit\n";
+    say FILE "Baseline config:\n";
+    say FILE Dump( $bl_conf );
+}
 
 ################################################################################
 #                                                                              #
