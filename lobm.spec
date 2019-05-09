@@ -2,7 +2,7 @@
 # spec file for package lobm
 #
 Name:           lobm
-Version:        4.2
+Version:        4.3
 Release:        1.0
 License:        Artistic
 Summary:        Linux OS Baseline Maker
