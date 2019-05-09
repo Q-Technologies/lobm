@@ -38,6 +38,8 @@ use 5.10.0;
 use constant DEBUG_MSG => "debug";
 use constant ERROR_MSG => "error";
 
+umask 0022;
+
 my $date_format = qr/\d{4,4}-\d\d-\d\d/;
 
 my $log = Log::MixedColor->new;
@@ -196,8 +198,13 @@ $log->fatal_err( "You need to specify the baseline name in the baseline file" ) 
 $baseline_dir = $baseline_dir . "/" . $name;
 remove_tree( $baseline_dir );
 if( ! -d $baseline_dir ){
-    my @paths = ( $baseline_dir."/RPMS/noarch", $baseline_dir."/RPMS/x86_64" );
-    push @paths, $baseline_dir."/RPMS/i686" unless $exclude_32bit;
+    my @paths = ( $baseline_dir."/RPMS/noarch" );
+    if( $target =~ /aix/i ){
+        push @paths, $baseline_dir."/RPMS/ppc";
+    } else {
+        push @paths, $baseline_dir."/RPMS/x86_64";
+        push @paths, $baseline_dir."/RPMS/i686" unless $exclude_32bit;
+    }
     if( ! make_path( @paths, {mode=>0755}) ){
         $log->fatal_err( "Could not create $baseline_dir: $!" );
     }
@@ -235,7 +242,7 @@ for my $rpm_dir ( @$rpm_dirs ){
         closedir DIR;
         OUTER: for my $rpm (@rpms ){
                 #next unless $rpm =~ /avahi-ui/;
-                next if( $rpm =~ /(\.src\.|\/boot\/|\.i\d86\.|\.drpm$|\.delta\.rpm$)/ and $exclude_32bit );
+                next if( $rpm =~ /(\.i\d86\.)/ and $exclude_32bit );
                 next if( $rpm =~ /(\.src\.|\/boot\/|\.drpm$|\.delta\.rpm$)/ );
                 my $mtime = (stat($rpm))[9];
                         #print $rpm, "\n";
@@ -246,6 +253,13 @@ for my $rpm_dir ( @$rpm_dirs ){
                         my $major = pop @arr;
                         my $pkg = join("-", @arr);
                         @arr = split( /\./, $minor );
+                        # Code added for AIX Specific processing
+                        if( $target =~ /aix/i ){
+                            my $pkg_for_os_rel = join(".",$arr[1],$arr[2]);
+                            $pkg_for_os_rel =~ s/aix//g;
+                            # skip RPM if its is higher version than selected os release
+                            next OUTER if ( $pkg_for_os_rel > $os_release  ); 
+                        }
                         my $ext = pop @arr;
                         pop @arr if $minor =~ /\.update\./;
                         my $arch = pop @arr;
@@ -361,6 +375,7 @@ FILE
         my $rc = $? >> 8;
         #print $rc . ":- " . $output;
         $log->fatal_err( "The createrepo command failed with the following error:\n$output" ) if $rc;
+        #system("chmod -R 755 $mainconf->{baseline_dir}/repodata") == 0 or warn "$0: chmod exited " . ($? >> 8);
     } else {
         $log->fatal_err( $log->quote($createrepo_cmd)." command could not be executed!" );
     }
@@ -379,7 +394,7 @@ my $name = basename($url);
 if( $target =~ /sles|suse/i ){
     say "\nUse this command to add the repository to client machines:\n";
     say "\tzypper ar -f -c -G $http_server_uri$url ".$name."\n";
-} elsif( $target =~ /red.*hat|centos|rhel/i ){
+} elsif( $target =~ /red.*hat|centos|rhel|aix/i ){
     say "Create '/etc/yum.repos.d/".$name.".repo' on each client with this content:";
     (my $filecontent = qq{
         [$name]
