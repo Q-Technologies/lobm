@@ -254,7 +254,7 @@ for my $rpm_dir ( @$rpm_dirs ){
                         my $pkg = join("-", @arr);
                         @arr = split( /\./, $minor );
                         # Code added for AIX Specific processing
-                        if( $target =~ /aix/i ){
+                        if( $target =~ /aix/i and $os_release ){
                             my $pkg_for_os_rel = join(".",$arr[1],$arr[2]);
                             $pkg_for_os_rel =~ s/aix//g;
                             # skip RPM if its is higher version than selected os release
